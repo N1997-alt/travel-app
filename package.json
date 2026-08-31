@@ -1,7 +1,7 @@
 {
   "name": "travel-app",
   "version": "1.0.0",
-  "description": "旅行记录 App - 足迹、账本、心声",
+  "description": "一陆向北 - 足迹、账本、心声 旅行记录 App",
   "private": true,
   "scripts": {
     "build": "cordova build android",

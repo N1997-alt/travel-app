@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <widget id="cn.workbuddy.travelapp" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0" xmlns:android="http://schemas.android.com/apk/res/android">
-    <name>旅行记录</name>
-    <description>点亮地图、旅行记账、心声日记</description>
+    <name>一陆向北</name>
+    <description>点亮地图、旅行记账、心声日记 · 把走过的路留成光</description>
     <author email="support@workbuddy.cn" href="https://www.workbuddy.cn">WorkBuddy</author>
     <content src="index.html" />
     <access origin="*" />

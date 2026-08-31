@@ -1,6 +1,6 @@
-# 旅行记录 App · Android APK 构建指南
+# 一陆向北 · Android APK 构建指南
 
-用 Apache Cordova 把 `www/index.html`（旅行记录原型）打包成 Android APK。
+用 Apache Cordova 把 `www/index.html`（一陆向北 原型）打包成 Android APK。
 
 > 应用功能：拍照上传 + 自由输入地名 → 腾讯地图点亮整座城市的行政边界；
 > 旅行记账（按类别统计 + 饼图）；心声日记（天气氛围配色）。
