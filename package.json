@@ -1,0 +1,13 @@
+{
+  "name": "travel-app",
+  "version": "1.0.0",
+  "description": "旅行记录 App - 足迹、账本、心声",
+  "private": true,
+  "scripts": {
+    "build": "cordova build android",
+    "android": "cordova run android"
+  },
+  "devDependencies": {
+    "cordova": "^12.0.0"
+  }
+}

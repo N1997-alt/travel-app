@@ -1,0 +1,17 @@
+# Cordova / Node 生成物，不要提交
+node_modules/
+platforms/
+plugins/
+hooks/
+
+# 本地构建缓存
+*.apk
+*.aab
+.gradle/
+local.properties
+
+# OS / 编辑器
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

@@ -1,0 +1,27 @@
+<?xml version='1.0' encoding='utf-8'?>
+<widget id="cn.workbuddy.travelapp" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0" xmlns:android="http://schemas.android.com/apk/res/android">
+    <name>旅行记录</name>
+    <description>点亮地图、旅行记账、心声日记</description>
+    <author email="support@workbuddy.cn" href="https://www.workbuddy.cn">WorkBuddy</author>
+    <content src="index.html" />
+    <access origin="*" />
+    <allow-intent href="http://*/*" />
+    <allow-intent href="https://*/*" />
+    <preference name="DisallowOverscroll" value="true" />
+    <preference name="android-minSdkVersion" value="24" />
+    <preference name="android-targetSdkVersion" value="34" />
+    <preference name="AndroidPersistentFileLocation" value="Compatibility" />
+    <preference name="scheme" value="app" />
+    <preference name="hostname" value="localhost" />
+    <preference name="AndroidXEnabled" value="true" />
+    <platform name="android">
+        <preference name="GradlePluginKotlinEnabled" value="true" />
+        <config-file target="AndroidManifest.xml" parent="/*">
+            <uses-permission android:name="android.permission.INTERNET" />
+            <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+            <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+            <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+            <uses-permission android:name="android.permission.CAMERA" />
+        </config-file>
+    </platform>
+</widget>
