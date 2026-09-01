@@ -29,12 +29,6 @@ body{
 @media(min-width:520px) and (min-height:700px){
   .phone{height:932px;border-radius:40px;border:1px solid #DCD2C2}
 }
-/* 状态栏 */
-.statusbar{height:46px;flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;padding:0 22px;font-size:13px;font-weight:700;color:var(--ink)}
-.sb-right{display:flex;align-items:center;gap:5px}
-.sb-bar{width:15px;height:10px;background:var(--ink);border-radius:2px}
-.sb-bat{width:22px;height:11px;border:1.5px solid var(--ink);border-radius:3px;position:relative}
-.sb-bat::after{content:"";position:absolute;right:-4px;top:3px;width:2px;height:5px;background:var(--ink);border-radius:0 1px 1px 0}
 /* 内容区 */
 .main{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding-bottom:8px}
 .screen{display:none}
@@ -157,8 +151,6 @@ body{
 .cg-s{margin-left:auto;font-size:13px;color:var(--primary);font-weight:800}
 #dy-w-img{width:34px;height:34px;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
 #dy-w-img svg{display:block}
-/* ===== 沉浸式状态栏（透明覆盖，底色铺满全屏） ===== */
-.statusbar{background:transparent;color:var(--ink);padding-top:calc(env(safe-area-inset-top,0px))}
 /* 地点模糊搜索下拉 */
 .place-sugs{display:none;margin-top:8px;border:1px solid var(--line);border-radius:12px;overflow:hidden;max-height:208px;overflow-y:auto;background:var(--card)}
 .sug{padding:10px 12px;font-size:14px;cursor:pointer;border-bottom:1px solid #F4EEE4;color:var(--ink);display:flex;align-items:baseline;gap:6px}
@@ -184,6 +176,11 @@ body{
 .cover-btn:active{background:#347A37}
 @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
 .cover .hint{position:relative;z-index:2;margin-top:14px;font-size:11px;color:#3E6E45;opacity:.7}
+/* 背景音乐开关 */
+.music-toggle{position:absolute;top:18px;right:18px;z-index:3;width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.28);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);border:1px solid rgba(255,255,255,.35);display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.music-toggle.muted{opacity:.55}
+#btn-music-diary{position:static;width:34px;height:34px;background:rgba(255,255,255,.55);border-color:rgba(0,0,0,.08);color:var(--ink)}
+.sheet-hd-right{display:flex;align-items:center;gap:10px}
 /* 封面 / 弹层打开时隐藏腾讯地图，防止其画布盖住封面与打卡弹层 */
 body.cover-on #map,body.sheet-open #map{visibility:hidden;pointer-events:none}
 /* 应用内确认弹窗（替代原生 confirm，APK 内可用） */
@@ -206,11 +203,6 @@ body.cover-on #map,body.sheet-open #map{visibility:hidden;pointer-events:none}
 <body class="cover-on">
 
 <div class="phone">
-  <div class="statusbar">
-    <span id="clock">9:41</span>
-    <div class="sb-right"><div class="sb-bar"></div><div class="sb-bat"></div></div>
-  </div>
-
   <div class="main">
 
     <!-- ============ 足迹 ============ -->
@@ -730,6 +722,7 @@ function showTab(name){
   Object.keys(map).forEach(function(k){ $(map[k]).classList.toggle('on', k===name); });
   document.querySelectorAll('.tab').forEach(function(b){ b.classList.toggle('on', b.dataset.tab===name); });
   if(name==='foot'){ setTimeout(safeResize, 60); }
+  if(name==='diary'){ playBgm('diary'); } else { pauseAllBgm(); }
 }
 document.querySelectorAll('.tab').forEach(function(b){
   b.addEventListener('click', function(){ showTab(b.dataset.tab); });
@@ -990,7 +983,7 @@ $('#ck-save').addEventListener('click', function(){
 /* 地点搜索实时联想 + 封面进入 */
 $('#ck-place').addEventListener('input', function(){ renderPlaceSugs(this.value); });
 $('#ck-place').addEventListener('blur', function(){ setTimeout(function(){ var b=$('#ck-sugs'); if(b) b.style.display='none'; },180); });
-$('#btn-enter').addEventListener('click', function(){ $('#sc-cover').style.display='none'; document.body.classList.remove('cover-on'); setTimeout(safeResize, 60); });
+$('#btn-enter').addEventListener('click', function(){ pauseAllBgm(); $('#sc-cover').style.display='none'; document.body.classList.remove('cover-on'); setTimeout(safeResize, 60); });
 
 /* =================================================
    模块二：账本
@@ -1261,9 +1254,28 @@ function renderDiaries(){
   });
 }
 
+/* ---------- 背景音乐 ---------- */
+/* 懒加载：脚本执行时 <audio> 尚未解析，运行时再取元素 */
+function bgAudio(which){ return which==='cover' ? document.getElementById('audio-cover') : document.getElementById('audio-diary'); }
+function pauseAllBgm(){ ['cover','diary'].forEach(function(w){ try{ var a=bgAudio(w); if(a) a.pause(); }catch(e){} }); }
+function playBgm(which){
+  pauseAllBgm();
+  var a = bgAudio(which);
+  if(!a) return;
+  try{ a.currentTime = 0; var p = a.play(); if(p && p.catch){ p.catch(function(){}); } }catch(e){}
+}
+var _bgKicked = false;
+function ensureBgm(){
+  if(_bgKicked) return; _bgKicked = true;
+  if(document.body.classList.contains('cover-on')) playBgm('cover');
+  document.removeEventListener('touchend', ensureBgm);
+  document.removeEventListener('click', ensureBgm);
+}
+document.addEventListener('touchend', ensureBgm);
+document.addEventListener('click', ensureBgm);
+
 /* ---------- 启动 ---------- */
 (function boot(){
-  var d=new Date(); $('#clock').textContent = d.getHours()+':'+pad2(d.getMinutes());
   loadAll();
   refreshMarkers();
   renderAlbum();
@@ -1287,5 +1299,7 @@ function renderDiaries(){
     else { setTimeout(function(){ if(typeof TMap !== 'undefined') initMap(); }, 1200); }
   });
 </script>
+<audio id="audio-cover" src="audio/cover-bg.wav" loop preload="auto"></audio>
+<audio id="audio-diary" src="audio/diary-bg.wav" loop preload="auto"></audio>
 </body>
 </html>
