@@ -53,6 +53,14 @@ body{
 /* 地图 */
 #map{width:100%;height:300px;border-radius:var(--r);overflow:hidden;background:var(--warm)}
 .map-wrap{padding:0 16px}
+/* 足迹屏：地图占据约 2/3 屏幕高度 */
+#sc-foot.on{display:flex;flex-direction:column;height:100%}
+#sc-foot.on .hd,#sc-foot.on .seg,#sc-foot.on #fv-map .pad,#sc-foot.on #fv-map .note{flex:0 0 auto}
+#sc-foot.on #fv-map{flex:1 1 auto;display:flex;flex-direction:column;min-height:0}
+#sc-foot.on .map-wrap{flex:1 1 auto;display:flex;flex-direction:column;min-height:0}
+#sc-foot.on #map{flex:1 1 auto;height:auto;min-height:320px}
+.pin-card .act{border:1px solid var(--line);background:var(--card);border-radius:9px;color:var(--ink);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;padding:5px 12px}
+.pin-card .act:active{background:var(--warm)}
 .pin-card{position:absolute;left:16px;right:16px;bottom:104px;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:12px;display:none;box-shadow:0 8px 24px rgba(61,50,41,.16);z-index:20}
 .pin-card.on{display:block}
 .pin-card .thumb{width:62px;height:62px;border-radius:10px;object-fit:cover;background:var(--warm);flex:0 0 auto}
@@ -67,6 +75,11 @@ body{
 .album-card .c{font-size:11px;color:var(--ink2);margin-top:4px;line-height:1.5}
 .album-card .album-del{margin-top:8px;width:100%;height:34px;border:1px solid var(--line);background:var(--card);border-radius:10px;color:#C0553F;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
 .album-card .album-del:active{background:var(--warm)}
+.album-card .album-actions{display:flex;gap:8px;margin-top:8px}
+.album-card .album-edit,.album-card .album-del{flex:1;height:34px;border:1px solid var(--line);border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+.album-card .album-edit{background:var(--card);color:var(--primary)}
+.album-card .album-del{background:var(--card);color:#C0553F}
+.album-card .album-edit:active,.album-card .album-del:active{background:var(--warm)}
 #pin-del{color:#C0553F;font-size:13px;font-weight:600;margin-left:6px}
 /* 账本 */
 .total-card{background:var(--primary);border-radius:var(--r);padding:16px;color:#fff;margin:0 16px}
@@ -241,7 +254,8 @@ body.cover-on #map,body.sheet-open #map{visibility:hidden;pointer-events:none}
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
             <button class="x" id="pin-close">✕</button>
-            <button id="pin-del">删除</button>
+            <button class="act" id="pin-edit">编辑</button>
+            <button class="act" id="pin-del">删除</button>
           </div>
         </div>
       </div>
@@ -753,6 +767,7 @@ function closeSheets(){
   document.body.classList.remove('sheet-open');
   $('#mask').classList.remove('on');
   document.querySelectorAll('.sheet').forEach(function(s){ s.classList.remove('on'); });
+  editingId=null;
 }
 $('#mask').addEventListener('click', closeSheets);
 document.querySelectorAll('[data-close]').forEach(function(b){ b.addEventListener('click', closeSheets); });
@@ -877,14 +892,26 @@ function drawRoute(){
     var A=pts[i], B=pts[i+1];
     lineGeo.push({ id:'seg-'+i, styleId:'route', paths:[ new TMap.LatLng(A.lat,A.lng), new TMap.LatLng(B.lat,B.lng) ] });
     var km=Math.round(haversineKm(A,B));
-    labelGeo.push({ id:'dist-'+i, styleId:'dist', position:new TMap.LatLng((A.lat+B.lat)/2,(A.lng+B.lng)/2), content: km+' KM' });
+    var off=perpOffset(A,B);
+    labelGeo.push({ id:'dist-'+i, styleId:'dist', position:new TMap.LatLng((A.lat+B.lat)/2+off.dlat,(A.lng+B.lng)/2+off.dlng), content: km+' KM' });
   }
   if(window.routeLine) window.routeLine.setGeometries(lineGeo);
   if(window.routeLabel) window.routeLabel.setGeometries(labelGeo);
 }
+/* 计算垂直于连线、偏向上方的地理偏移，让距离标签落在连线一侧，不再压住线 */
+function perpOffset(A,B){
+  var dx=B.lng-A.lng, dy=B.lat-A.lat;
+  var len=Math.sqrt(dx*dx+dy*dy)||1e-6;
+  var px=-dy/len, py=dx/len;
+  if(py<0){ px=-px; py=-py; }
+  var mag=Math.min(0.22, len*0.35);
+  return { dlng:px*mag, dlat:py*mag };
+}
 var currentPinId=null;
+var currentPinRec=null;
 function showPin(rec){
   currentPinId=rec.id;
+  currentPinRec=rec;
   $('#pin-name').textContent = rec.label || rec.name;
   $('#pin-time').textContent = fmtTime(rec.time);
   $('#pin-cap').textContent  = rec.caption || '（没有留下文字）';
@@ -902,6 +929,7 @@ $('#pin-del').addEventListener('click', function(){
     $('#pin-card').classList.remove('on'); toast('已删除足迹');
   });
 });
+$('#pin-edit').addEventListener('click', function(){ if(currentPinRec) openCheckinEdit(currentPinRec); });
 
 function renderAlbum(){
   var box=$('#album');
@@ -916,7 +944,7 @@ function renderAlbum(){
       + '<div class="meta"><div class="n">'+esc(c.name)+'</div>'
       + '<div class="d">'+fmtTime(c.time)+'</div>'
       + (c.caption ? '<div class="c">'+esc(c.caption)+'</div>' : '')
-      + '<button class="album-del" data-delck="'+c.id+'">删除</button></div></div>';
+      + '<div class="album-actions"><button class="album-edit" data-editck="'+c.id+'">编辑</button><button class="album-del" data-delck="'+c.id+'">删除</button></div></div></div>';
   }).join('');
   document.querySelectorAll('[data-delck]').forEach(function(b){
     b.addEventListener('click', function(){
@@ -927,12 +955,31 @@ function renderAlbum(){
       });
     });
   });
+  document.querySelectorAll('[data-editck]').forEach(function(b){
+    b.addEventListener('click', function(){
+      var rec=findCk(b.dataset.editck);
+      if(rec) openCheckinEdit(rec);
+    });
+  });
 }
 
 /* 拍照打卡（开放式：自己拍、自己写地名） */
 var ckPhoto=null;
+var editingId=null;
+function findCk(id){ for(var i=0;i<state.ck.length;i++){ if(state.ck[i].id===id) return state.ck[i]; } return null; }
+function openCheckinEdit(rec){
+  if(!rec) return;
+  editingId=rec.id;
+  ckPhoto=rec.photo||null;
+  $('#ck-photo-box').innerHTML = rec.photo ? '<img src="'+rec.photo+'" alt="">' : '<span style="font-size:13px;color:var(--sub)">从相册中选择</span>';
+  $('#ck-place').value=rec.name||'';
+  $('#ck-cap').value=rec.caption||'';
+  var sg=$('#ck-sugs'); if(sg){ sg.style.display='none'; sg.innerHTML=''; }
+  openSheet('#sheet-checkin');
+}
 $('#btn-checkin').addEventListener('click', function(){
   ckPhoto=null;
+  editingId=null;
   $('#ck-photo-box').innerHTML='<span style="font-size:13px;color:var(--sub)">从相册中选择</span>';
   $('#ck-place').value='';
   $('#ck-cap').value='';
@@ -957,17 +1004,49 @@ $('#ck-save').addEventListener('click', function(){
   var entry=lookupPlace(name);
   if(!entry){ toast('没找到「'+name+'」，试试更标准的地名（如“宾阳县”“南宁市”）'); return; }
   var adcode=entry[0];
-  var lat=entry[3]!=null?entry[4]:null;   /* entry: [adcode,name,parent,lng,lat,level] */
-  var lng=entry[3]!=null?entry[3]:null;
+  var elat=entry[3]!=null?entry[4]:null;   /* entry: [adcode,name,parent,lng,lat,level] */
+  var elng=entry[3]!=null?entry[3]:null;
+  if(editingId){
+    var erec=findCk(editingId);
+    if(erec){
+      var oldName=erec.name;
+      erec.name=name; erec.label=cascadeName(entry)||name; erec.caption=cap;
+      erec.photo=photo;
+      erec.adcode=adcode;
+      if(elat!=null){ erec.lat=elat; erec.lng=elng; }
+      save(K.ck, state.ck);
+      refreshMarkers(); renderAlbum();
+      /* 同步刷新地图气泡（如正打开着） */
+      if(currentPinRec && currentPinRec.id===erec.id){
+        currentPinRec=erec;
+        $('#pin-name').textContent=erec.label||erec.name;
+        $('#pin-time').textContent=fmtTime(erec.time);
+        $('#pin-cap').textContent=erec.caption||'（没有留下文字）';
+        var pi=$('#pin-img'); if(erec.photo){ pi.src=erec.photo; pi.style.display=''; } else { pi.style.display='none'; }
+      }
+      toast('已更新 '+name);
+      if(name!==oldName){
+        erec.rings=null;
+        fetchBoundary(adcode, function(rings, center){
+          if(rings){
+            erec.rings=rings;
+            if(center && (erec.lat==null||erec.lng==null)){ erec.lat=center[0]; erec.lng=center[1]; }
+            save(K.ck, state.ck); refreshMarkers(); toast('已点亮 '+erec.label+' 全境');
+          }
+        });
+      }
+    }
+    editingId=null; closeSheets(); return;
+  }
   var rec={
     id:uid(), name:name, label:cascadeName(entry)||name,
-    lat:lat, lng:lng, rings:null,
+    lat:elat, lng:elng, rings:null,
     photo:photo, caption:cap, time:Date.now(), adcode:adcode
   };
   state.ck.push(rec);
   save(K.ck, state.ck);
   refreshMarkers(); renderAlbum(); closeSheets();
-  toast('已点亮 '+name+(lat!=null?'':'（索引暂无坐标）'));
+  toast('已点亮 '+name+(elat!=null?'':'（索引暂无坐标）'));
   /* 异步拉取真实行政边界，到达后升级为金色整片填充 */
   fetchBoundary(adcode, function(rings, center){
     if(rings){
