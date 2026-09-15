@@ -1364,19 +1364,30 @@ $('#btn-tpl').addEventListener('click', function(){
   }
 });
 
-/* 手机端：写入应用缓存目录并调起系统分享面板，用户可“保存到文件/微信/蓝牙” */
+/* 手机端：写入外部缓存（FileProvider 可访问）并调起系统分享面板，用户可“保存到文件/微信/蓝牙” */
 function saveFileAndShare(b64, filename, mime){
-  var dir=(window.cordova && cordova.file && cordova.file.cacheDirectory)?cordova.file.cacheDirectory:null;
-  if(!dir){
-    var uri='data:'+mime+';base64,'+b64;
-    window.plugins.socialsharing.shareWithOptions({subject:filename, files:[uri]}, function(){ toast('已调起系统分享，选“保存到文件”即可'); }, function(e){ toast('分享失败：'+e); });
+  if(!(window.cordova && window.plugins && window.plugins.socialsharing)){
+    var bin=atob(b64), ab=new ArrayBuffer(bin.length), ia=new Uint8Array(ab);
+    for(var i=0;i<bin.length;i++){ ia[i]=bin.charCodeAt(i); }
+    download(new Blob([ab], {type:mime}), filename);
+    toast('已在浏览器下载：'+filename);
     return;
   }
+  /* 优先用外部缓存（/storage/emulated/0/Android/data/包名/cache），该路径被分享插件的 FileProvider 覆盖；
+     内部缓存（/data/data/...）不在白名单，会导致分享失败、文件也找不到 */
+  var dir=(cordova.file && cordova.file.externalCacheDirectory)?cordova.file.externalCacheDirectory:(cordova.file&&cordova.file.cacheDirectory?cordova.file.cacheDirectory:null);
+  if(!dir){ toast('无法定位存储目录'); return; }
   window.resolveLocalFileSystemURL(dir, function(d){
     d.getFile(filename, {create:true, exclusive:false}, function(fe){
       fe.createWriter(function(w){
         w.onwriteend=function(){
-          window.plugins.socialsharing.shareWithOptions({subject:filename, files:[fe.toURL()]}, function(){ toast('已调起系统分享，选“保存到文件/微信”即可'); }, function(e){ toast('分享失败：'+e); });
+          try{
+            window.plugins.socialsharing.shareWithOptions(
+              {subject:filename, text:filename, files:[fe.toURL()]},
+              function(){ toast('已调起系统分享面板，选择“微信 / 保存到文件”即可'); },
+              function(e){ toast('分享未成功，文件已存于：'+fe.fullPath+'（可用文件管理器找到）'); }
+            );
+          }catch(err){ toast('分享调用异常：'+(err&&err.message?err.message:err)); }
         };
         w.onerror=function(){ toast('写入文件失败'); };
         var bs=atob(b64), ab=new ArrayBuffer(bs.length), ia=new Uint8Array(ab);
