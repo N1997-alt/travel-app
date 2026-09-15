@@ -1341,10 +1341,38 @@ $('#btn-tpl').addEventListener('click', function(){
   var ws=XLSX.utils.aoa_to_sheet(tpl);
   var wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '导入模板');
-  var out=XLSX.write(wb, {bookType:'xlsx', type:'array'});
-  download(new Blob([out], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), '账本导入模板.xlsx');
-  toast('模板已下载');
+  var b64=XLSX.write(wb, {bookType:'xlsx', type:'base64'});
+  if(window.cordova && window.plugins && window.plugins.socialsharing){
+    saveXlsxAndShare(b64, '账本导入模板.xlsx');
+  } else {
+    var out=XLSX.write(wb, {bookType:'xlsx', type:'array'});
+    download(new Blob([out], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), '账本导入模板.xlsx');
+    toast('模板已下载');
+  }
 });
+
+/* 手机端：写入应用缓存目录并调起系统分享面板，用户可“保存到文件/微信/蓝牙” */
+function saveXlsxAndShare(b64, filename){
+  var dir=(window.cordova && cordova.file && cordova.file.cacheDirectory)?cordova.file.cacheDirectory:null;
+  if(!dir){
+    var uri='data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,'+b64;
+    window.plugins.socialsharing.shareWithOptions({subject:filename, files:[uri]}, function(){ toast('已调起系统分享，选“保存到文件”即可'); }, function(e){ toast('分享失败：'+e); });
+    return;
+  }
+  window.resolveLocalFileSystemURL(dir, function(d){
+    d.getFile(filename, {create:true, exclusive:false}, function(fe){
+      fe.createWriter(function(w){
+        w.onwriteend=function(){
+          window.plugins.socialsharing.shareWithOptions({subject:filename, files:[fe.toURL()]}, function(){ toast('已调起系统分享，选“保存到文件/微信”即可'); }, function(e){ toast('分享失败：'+e); });
+        };
+        w.onerror=function(){ toast('写入文件失败'); };
+        var bs=atob(b64), ab=new ArrayBuffer(bs.length), ia=new Uint8Array(ab);
+        for(var i=0;i<bs.length;i++){ ia[i]=bs.charCodeAt(i); }
+        w.write(new Blob([ab], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+      }, function(){ toast('创建写入器失败'); });
+    }, function(){ toast('创建文件失败'); });
+  }, function(){ toast('目录解析失败'); });
+}
 
 $('#btn-clear').addEventListener('click', function(){
   confirmDialog('确定清空全部数据？此操作不可恢复。', function(){
