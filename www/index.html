@@ -212,6 +212,7 @@ body.cover-on #map,body.sheet-open #map{visibility:hidden;pointer-events:none}
 .dy-quote p:last-child{margin-bottom:0}
 .dy-quote p:first-child{color:var(--primary);font-weight:700;font-size:14px}
 </style>
+<script src="js/xlsx.full.min.js"></script>
 </head>
 <body class="cover-on">
 
@@ -303,13 +304,25 @@ body.cover-on #map,body.sheet-open #map{visibility:hidden;pointer-events:none}
 
       <div id="lv-tools" style="display:none">
         <div class="pad">
-          <div class="sec-title" style="margin-top:6px">数据导出</div>
+          <div class="sec-title" style="margin-top:6px">数据导入</div>
+          <div class="card">
+            <div style="font-size:13px;line-height:1.8;color:var(--ink2)">
+              上传 Excel 即可批量更新账本。表格首行表头需为「日期、类别、金额、备注」，每行一条费用。
+            </div>
+            <button class="btn ghost sm" id="btn-xlsx-pick" style="margin-top:12px">导入账本 Excel</button>
+            <button class="btn ghost sm" id="btn-tpl" style="margin-top:10px">下载导入模板</button>
+            <input type="file" id="xlsx-file" accept=".xlsx,.xls" style="display:none">
+            <div style="font-size:11px;color:var(--sub);margin-top:8px;line-height:1.6">
+              类别请填写分类名（如：餐饮、油费、高速费、汽车维修美容、礼物）。无法识别的行会自动跳过。
+            </div>
+          </div>
+          <div class="sec-title" style="margin:18px 0 4px">数据导出</div>
           <div class="card">
             <div style="font-size:13px;line-height:1.8;color:var(--ink2)">
               所有数据仅保存在这台设备的浏览器里，不会上传。你可以随时导出备份。
             </div>
-            <button class="btn ghost sm" id="btn-csv" style="margin-top:12px">导出账本为 CSV</button>
-            <button class="btn ghost sm" id="btn-txt" style="margin-top:10px">导出心声为 TXT</button>
+            <button class="btn ghost sm" id="btn-csv" style="margin-top:12px">导出账本为 Excel</button>
+            <button class="btn ghost sm" id="btn-txt" style="margin-top:10px">导出心声为 Word</button>
             <button class="btn ghost sm" id="btn-clear" style="margin-top:10px;color:#C0553F">清空全部数据</button>
           </div>
         </div>
@@ -592,11 +605,21 @@ var CATS = [
   {k:'stay',    n:'住宿', c:'#7A8B5A'},
   {k:'traffic', n:'交通', c:'#4E7A8A'},
   {k:'ticket',  n:'门票', c:'#D9A441'},
+  {k:'fuel',    n:'油费', c:'#C77B30'},
+  {k:'toll',    n:'高速费', c:'#3E7CA0'},
+  {k:'car',     n:'汽车维修美容', c:'#6B7280'},
   {k:'shop',    n:'购物', c:'#A5678E'},
+  {k:'gift',    n:'礼物', c:'#B0587D'},
   {k:'other',   n:'其他', c:'#8A7968'}
 ];
 function catOf(k){ for(var i=0;i<CATS.length;i++){ if(CATS[i].k===k) return CATS[i]; } return CATS[CATS.length-1]; }
 function catName(k){ return catOf(k).n; }
+function catKeyByName(n){
+  n=String(n==null?'':n).trim();
+  for(var i=0;i<CATS.length;i++){ if(CATS[i].n===n || CATS[i].k===n) return CATS[i].k; }
+  for(var j=0;j<CATS.length;j++){ if(n.indexOf(CATS[j].n)>=0) return CATS[j].k; }
+  return null;
+}
 
 /* ---------- 图标 ---------- */
 function svg(inner, size, color){
@@ -608,6 +631,10 @@ var ICONS = {
   traffic:'<path d="M5 6h14v9H5z" stroke="#C" stroke-width="2" stroke-linejoin="round"/><path d="M5 11h14M8 19v-3M16 19v-3" stroke="#C" stroke-width="2" stroke-linecap="round"/><circle cx="8.5" cy="13.5" r="1" fill="#C"/><circle cx="15.5" cy="13.5" r="1" fill="#C"/>',
   ticket:'<path d="M5 8h14l-1 9H6L5 8Z" stroke="#C" stroke-width="2" stroke-linejoin="round"/><path d="M14 8l-1 9" stroke="#C" stroke-width="2" stroke-linecap="round"/>',
   shop:'<path d="M6 8h12l-1 12H7L6 8Z" stroke="#C" stroke-width="2" stroke-linejoin="round"/><path d="M9 8V6a3 3 0 0 1 6 0v2" stroke="#C" stroke-width="2" stroke-linecap="round"/>',
+  fuel:'<path d="M6 3h6v18H6z" stroke="#C" stroke-width="2" stroke-linejoin="round"/><path d="M12 7h3a2 2 0 0 1 2 2v6a2 2 0 0 0 2 2 2 2 0 0 0 2-2V9l-2-2" stroke="#C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 6v4" stroke="#C" stroke-width="2" stroke-linecap="round"/>',
+  toll:'<path d="M4 20V9a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v11" stroke="#C" stroke-width="2" stroke-linejoin="round"/><path d="M4 9h16" stroke="#C" stroke-width="2"/><path d="M12 7v2" stroke="#C" stroke-width="2" stroke-linecap="round"/>',
+  car:'<path d="M5 11l1.6-4.2A2 2 0 0 1 8.5 5.5h7a2 2 0 0 1 1.9 1.3L19 11" stroke="#C" stroke-width="2" stroke-linejoin="round"/><path d="M3.5 11h17v5h-17z" stroke="#C" stroke-width="2" stroke-linejoin="round"/><circle cx="7.5" cy="16.5" r="1.4" fill="#C"/><circle cx="16.5" cy="16.5" r="1.4" fill="#C"/>',
+  gift:'<rect x="4" y="9" width="16" height="11" rx="1.5" stroke="#C" stroke-width="2"/><path d="M4 13h16M12 9v11" stroke="#C" stroke-width="2"/><path d="M12 9C12 6 9.5 4.2 7.8 6S9.2 9 12 9Z" stroke="#C" stroke-width="2" stroke-linejoin="round"/><path d="M12 9C12 6 14.5 4.2 16.2 6S14.8 9 12 9Z" stroke="#C" stroke-width="2" stroke-linejoin="round"/>',
   other:'<circle cx="6" cy="12" r="1.6" fill="#C"/><circle cx="12" cy="12" r="1.6" fill="#C"/><circle cx="18" cy="12" r="1.6" fill="#C"/>'
 };
 /* 天气图标与主题（写心声时根据天气切换整体氛围） */
@@ -1189,31 +1216,136 @@ function renderCategoryBreakdown(){
   }).join('');
 }
 
+/* ---------- 轻量 Word(.docx) 生成（无第三方依赖，存储式 ZIP） ---------- */
+var CRC_T=(function(){ var t=[]; for(var n=0;n<256;n++){ var c=n; for(var k=0;k<8;k++){ c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1); } t[n]=c>>>0; } return t; })();
+function crc32Bytes(b){ var c=~0>>>0; for(var i=0;i<b.length;i++){ c=CRC_T[(c^b[i])&0xFF]^(c>>>8); } return (~c)>>>0; }
+function u16(n){ return [n&0xFF,(n>>8)&0xFF]; }
+function u32(n){ return [n&0xFF,(n>>8)&0xFF,(n>>16)&0xFF,(n>>24)&0xFF]; }
+function buildZip(files){
+  var parts=[], central=[], offset=0;
+  files.forEach(function(f){
+    var nameBytes=f.name.split('').map(function(ch){ return ch.charCodeAt(0)&0xFF; });
+    var crc=crc32Bytes(f.bytes), size=f.bytes.length;
+    var local=[].concat(u32(0x04034b50),u16(20),u16(0),u16(0),u16(0),u16(0),u32(crc),u32(size),u32(size),u16(nameBytes.length),u16(0));
+    var lh=new Uint8Array(local);
+    parts.push(lh); parts.push(new Uint8Array(nameBytes)); parts.push(f.bytes);
+    var rec=[].concat(u32(0x02014b50),u16(20),u16(20),u16(0),u16(0),u16(0),u16(0),u32(crc),u32(size),u32(size),u16(nameBytes.length),u16(0),u16(0),u16(0),u16(0),u32(0),u32(offset));
+    central.push({h:new Uint8Array(rec), n:new Uint8Array(nameBytes)});
+    offset+=lh.length+nameBytes.length+size;
+  });
+  var cd=[]; central.forEach(function(c){ cd.push(c.h); cd.push(c.n); });
+  var cdSize=cd.reduce(function(s,a){ return s+a.length; },0), cdStart=offset;
+  var end=[].concat(u32(0x06054b50),u16(0),u16(0),u16(files.length),u16(files.length),u32(cdSize),u32(cdStart),u16(0));
+  var total=offset+cdSize+end.length, out=new Uint8Array(total), pos=0;
+  function put(a){ out.set(a,pos); pos+=a.length; }
+  parts.forEach(put); cd.forEach(put); put(new Uint8Array(end));
+  return out;
+}
+function docxEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function makeDocxXml(entries){
+  function run(text,bold){ return '<w:r>'+(bold?'<w:rPr><w:b/></w:rPr>':'')+'<w:t xml:space="preserve">'+docxEsc(text)+'</w:t></w:r>'; }
+  function para(runs){ return '<w:p>'+runs.join('')+'</w:p>'; }
+  var ps=[];
+  entries.forEach(function(e){
+    ps.push(para([run('【'+(e.time||'')+'】'+(e.weather?('  天气：'+e.weather):''),true)]));
+    if(e.title) ps.push(para([run(e.title,true)]));
+    String(e.body||'').split('\n').forEach(function(line){ ps.push(para([run(line,false)])); });
+    ps.push(para([run('——————',false)]));
+  });
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n'
+    + '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>'
+    + ps.join('') + '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr></w:body></w:document>';
+}
+function makeDocxBlob(entries){
+  function u8(s){ return new TextEncoder().encode(s); }
+  var files=[
+    {name:'[Content_Types].xml', bytes:u8('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>')},
+    {name:'_rels/.rels', bytes:u8('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>')},
+    {name:'word/document.xml', bytes:u8(makeDocxXml(entries))},
+    {name:'word/_rels/document.xml.rels', bytes:u8('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>')}
+  ];
+  return new Blob([buildZip(files)], {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+}
+
 /* 导出 */
 $('#btn-csv').addEventListener('click', function(){
+  if(typeof XLSX==='undefined'){ toast('Excel 组件未加载'); return; }
   if(!state.ex.length){ toast('还没有账本数据'); return; }
-  var rows=[['日期','类别','金额','备注']];
+  var data=[['日期','类别','金额','备注']];
   state.ex.slice().sort(function(a,b){ return a.date<b.date?1:-1; }).forEach(function(e){
-    rows.push([e.date, catName(e.category), e.amount, e.note||'']);
+    data.push([e.date, catName(e.category), e.amount, e.note||'']);
   });
-  var csv='\ufeff'+rows.map(function(r){
-    return r.map(function(c){ return '"'+String(c).replace(/"/g,'""')+'"'; }).join(',');
-  }).join('\n');
-  download(new Blob([csv],{type:'text/csv;charset=utf-8'}), '旅行账本.csv');
-  toast('已导出 CSV');
+  var ws=XLSX.utils.aoa_to_sheet(data);
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '账本');
+  var out=XLSX.write(wb, {bookType:'xlsx', type:'array'});
+  download(new Blob([out], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), '旅行账本.xlsx');
+  toast('已导出 Excel');
 });
 $('#btn-txt').addEventListener('click', function(){
   if(!state.dy.length){ toast('还没有心声数据'); return; }
-  var txt='';
-  state.dy.slice().sort(function(a,b){ return a.createdAt-b.createdAt; }).forEach(function(d){
-    txt += '【' + fmtTime(d.createdAt) + '】' + (d.weather? ' 天气：'+d.weather : '') + '\n';
-    if(d.title) txt += d.title + '\n';
-    txt += d.body + '\n';
-    txt += '——————————\n\n';
+  var entries=state.dy.slice().sort(function(a,b){ return a.createdAt-b.createdAt; }).map(function(d){
+    return { time:fmtTime(d.createdAt), weather:d.weather||'', title:d.title||'', body:d.body||'' };
   });
-  download(new Blob([txt],{type:'text/plain;charset=utf-8'}), '旅行心声.txt');
-  toast('已导出 TXT');
+  download(makeDocxBlob(entries), '旅行心声.docx');
+  toast('已导出 Word');
 });
+
+/* 费用 Excel 导入 */
+$('#btn-xlsx-pick').addEventListener('click', function(){ $('#xlsx-file').click(); });
+$('#xlsx-file').addEventListener('change', function(ev){
+  var f=ev.target.files && ev.target.files[0];
+  if(!f) return;
+  if(typeof XLSX==='undefined'){ toast('Excel 组件未加载'); ev.target.value=''; return; }
+  var rd=new FileReader();
+  rd.onload=function(e){
+    try{
+      var wb=XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+      var ws=wb.Sheets[wb.SheetNames[0]];
+      var rows=XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+      if(!rows.length){ toast('Excel 没有数据'); return; }
+      var hdrIdx=-1, col={};
+      for(var r=0;r<Math.min(rows.length,6);r++){
+        var found=0, m={};
+        (rows[r]||[]).forEach(function(c,ci){
+          var s=String(c).trim();
+          if(s==='日期'){ m.date=ci; found++; }
+          else if(s==='类别'){ m.cat=ci; found++; }
+          else if(s==='金额'){ m.amt=ci; found++; }
+          else if(s==='备注'){ m.note=ci; found++; }
+        });
+        if(found>=3){ hdrIdx=r; col=m; break; }
+      }
+      if(hdrIdx<0){ toast('请把首行表头设为：日期、类别、金额、备注'); ev.target.value=''; return; }
+      var added=0, skipped=0;
+      for(var i=hdrIdx+1;i<rows.length;i++){
+        var row=rows[i]||[];
+        var amt=parseFloat(String(row[col.amt]==null?'':row[col.amt]).replace(/[^\d.\-]/g,''));
+        var catKey=catKeyByName(row[col.cat]);
+        if(catKey==null || isNaN(amt) || amt<=0){ skipped++; continue; }
+        state.ex.push({ id:uid(), amount:amt, category:catKey, date:String(row[col.date]==null?'':row[col.date]).trim(), note:String(row[col.note]==null?'':row[col.note]).trim(), ts:Date.now() });
+        added++;
+      }
+      save(K.ex, state.ex); renderLedger(); renderStats();
+      toast('已导入 '+added+' 条'+(skipped?('，跳过 '+skipped+' 条'):''));
+    }catch(err){ console.error(err); toast('Excel 解析失败'); }
+    ev.target.value='';
+  };
+  rd.readAsArrayBuffer(f);
+});
+
+/* 下载导入模板 */
+$('#btn-tpl').addEventListener('click', function(){
+  if(typeof XLSX==='undefined'){ toast('Excel 组件未加载'); return; }
+  var tpl=[['日期','类别','金额','备注'],['2026-09-01','餐饮','68','午饭'],['2026-09-01','油费','320','加满一箱'],['2026-09-02','门票','150','景区门票']];
+  var ws=XLSX.utils.aoa_to_sheet(tpl);
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '导入模板');
+  var out=XLSX.write(wb, {bookType:'xlsx', type:'array'});
+  download(new Blob([out], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), '账本导入模板.xlsx');
+  toast('模板已下载');
+});
+
 $('#btn-clear').addEventListener('click', function(){
   confirmDialog('确定清空全部数据？此操作不可恢复。', function(){
     state={ck:[],ex:[],dy:[]};
