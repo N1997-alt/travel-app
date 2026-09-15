@@ -8,6 +8,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,7 +27,17 @@ jobs:
           java-version: 17
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        run: |
+          SDK=$ANDROID_HOME
+          SDKMANAGER=$(ls $SDK/cmdline-tools/*/bin/sdkmanager 2>/dev/null | head -1)
+          echo "$SDK/cmdline-tools/latest/bin" >> $GITHUB_PATH
+          echo "$SDK/platform-tools" >> $GITHUB_PATH
+          echo "ANDROID_HOME=$SDK" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$SDK" >> $GITHUB_ENV
+          # Accept all Android SDK licenses non-interactively
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          # Install the platform + build tools required by config.xml (targetSdkVersion 34)
+          "$SDKMANAGER" "platforms;android-34" "build-tools;34.0.0" "platform-tools"
 
       - name: Install Cordova
         run: npm install
