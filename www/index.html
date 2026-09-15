@@ -1364,30 +1364,37 @@ $('#btn-tpl').addEventListener('click', function(){
   }
 });
 
-/* 手机端：写入外部缓存（FileProvider 可访问）并调起系统分享面板，用户可“保存到文件/微信/蓝牙” */
+/* 手机端：优先用 file 插件把文件写入外部缓存（可写且能被系统分享插件访问）；
+   写成功后若 socialsharing 可用则调起系统分享面板（微信/保存到文件/蓝牙），
+   否则明确提示文件已保存的路径。仅 PC 预览（无 cordova）才走浏览器 blob 下载。 */
 function saveFileAndShare(b64, filename, mime){
-  if(!(window.cordova && window.plugins && window.plugins.socialsharing)){
+  /* 非 Cordova 环境（PC 预览）：直接浏览器下载 */
+  if(!(window.cordova && cordova.file)){
     var bin=atob(b64), ab=new ArrayBuffer(bin.length), ia=new Uint8Array(ab);
     for(var i=0;i<bin.length;i++){ ia[i]=bin.charCodeAt(i); }
     download(new Blob([ab], {type:mime}), filename);
-    toast('已在浏览器下载：'+filename);
+    toast('已下载：'+filename);
     return;
   }
-  /* 优先用外部缓存（/storage/emulated/0/Android/data/包名/cache），该路径被分享插件的 FileProvider 覆盖；
+  /* 优先外部缓存（/storage/emulated/0/Android/data/包名/cache），该路径被分享插件的 FileProvider 覆盖；
      内部缓存（/data/data/...）不在白名单，会导致分享失败、文件也找不到 */
-  var dir=(cordova.file && cordova.file.externalCacheDirectory)?cordova.file.externalCacheDirectory:(cordova.file&&cordova.file.cacheDirectory?cordova.file.cacheDirectory:null);
+  var dir=cordova.file.externalCacheDirectory || cordova.file.cacheDirectory || null;
   if(!dir){ toast('无法定位存储目录'); return; }
   window.resolveLocalFileSystemURL(dir, function(d){
     d.getFile(filename, {create:true, exclusive:false}, function(fe){
       fe.createWriter(function(w){
         w.onwriteend=function(){
-          try{
-            window.plugins.socialsharing.shareWithOptions(
-              {subject:filename, text:filename, files:[fe.toURL()]},
-              function(){ toast('已调起系统分享面板，选择“微信 / 保存到文件”即可'); },
-              function(e){ toast('分享未成功，文件已存于：'+fe.fullPath+'（可用文件管理器找到）'); }
-            );
-          }catch(err){ toast('分享调用异常：'+(err&&err.message?err.message:err)); }
+          if(window.plugins && window.plugins.socialsharing){
+            try{
+              window.plugins.socialsharing.shareWithOptions(
+                {subject:filename, text:filename, files:[fe.toURL()]},
+                function(){ toast('已调起系统分享，选“微信 / 保存到文件”即可'); },
+                function(e){ toast('文件已保存：'+fe.fullPath+'（可在文件管理器找到并分享）'); }
+              );
+            }catch(err){ toast('已保存：'+fe.fullPath); }
+          } else {
+            toast('已保存到：'+fe.fullPath+'（文件管理器中可打开并分享）');
+          }
         };
         w.onerror=function(){ toast('写入文件失败'); };
         var bs=atob(b64), ab=new ArrayBuffer(bs.length), ia=new Uint8Array(ab);
