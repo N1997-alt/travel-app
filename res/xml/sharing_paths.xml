@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 覆盖所有可能的 Cordova 文件目录，确保系统分享面板能读取到我们写出的文件 -->
+    <external-path name="external_files" path="." />
+    <external-cache-path name="external_cache" path="." />
+    <external-files-path name="external_files_dir" path="." />
+    <external-media-path name="external_media" path="." />
+    <files-path name="internal_files" path="." />
+    <cache-path name="internal_cache" path="." />
+    <root-path name="root" path="." />
+</paths>

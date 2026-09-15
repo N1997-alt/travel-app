@@ -1356,7 +1356,7 @@ $('#btn-tpl').addEventListener('click', function(){
   XLSX.utils.book_append_sheet(wb, ws, '导入模板');
   var b64=XLSX.write(wb, {bookType:'xlsx', type:'base64'});
   if(window.cordova && window.plugins && window.plugins.socialsharing){
-    saveXlsxAndShare(b64, '账本导入模板.xlsx');
+    saveFileAndShare(b64, '账本导入模板.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   } else {
     var out=XLSX.write(wb, {bookType:'xlsx', type:'array'});
     download(new Blob([out], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), '账本导入模板.xlsx');
