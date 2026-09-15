@@ -1364,45 +1364,39 @@ $('#btn-tpl').addEventListener('click', function(){
   }
 });
 
-/* 手机端：优先用 file 插件把文件写入外部缓存（可写且能被系统分享插件访问）；
-   写成功后若 socialsharing 可用则调起系统分享面板（微信/保存到文件/蓝牙），
-   否则明确提示文件已保存的路径。仅 PC 预览（无 cordova）才走浏览器 blob 下载。 */
+/* 手机端：自定义原生插件把 base64 写成文件并调起系统分享面板（微信/保存到文件/蓝牙）；
+   若插件不可用则降级用 file 插件写外部缓存并提示路径；PC 预览走浏览器 blob 下载。 */
 function saveFileAndShare(b64, filename, mime){
-  /* 非 Cordova 环境（PC 预览）：直接浏览器下载 */
-  if(!(window.cordova && cordova.file)){
-    var bin=atob(b64), ab=new ArrayBuffer(bin.length), ia=new Uint8Array(ab);
-    for(var i=0;i<bin.length;i++){ ia[i]=bin.charCodeAt(i); }
-    download(new Blob([ab], {type:mime}), filename);
-    toast('已下载：'+filename);
+  /* 1) 自定义原生插件：最稳，直接调起系统分享面板 */
+  if(window.cordova && cordova.plugins && cordova.plugins.saveandshare){
+    cordova.plugins.saveandshare.saveAndShare(b64, filename, mime,
+      function(path){ toast('已调起系统分享，选“微信 / 保存到文件”即可'); },
+      function(e){ toast('保存失败：'+e); });
     return;
   }
-  /* 优先外部缓存（/storage/emulated/0/Android/data/包名/cache），该路径被分享插件的 FileProvider 覆盖；
-     内部缓存（/data/data/...）不在白名单，会导致分享失败、文件也找不到 */
-  var dir=cordova.file.externalCacheDirectory || cordova.file.cacheDirectory || null;
-  if(!dir){ toast('无法定位存储目录'); return; }
-  window.resolveLocalFileSystemURL(dir, function(d){
-    d.getFile(filename, {create:true, exclusive:false}, function(fe){
-      fe.createWriter(function(w){
-        w.onwriteend=function(){
-          if(window.plugins && window.plugins.socialsharing){
-            try{
-              window.plugins.socialsharing.shareWithOptions(
-                {subject:filename, text:filename, files:[fe.toURL()]},
-                function(){ toast('已调起系统分享，选“微信 / 保存到文件”即可'); },
-                function(e){ toast('文件已保存：'+fe.fullPath+'（可在文件管理器找到并分享）'); }
-              );
-            }catch(err){ toast('已保存：'+fe.fullPath); }
-          } else {
-            toast('已保存到：'+fe.fullPath+'（文件管理器中可打开并分享）');
-          }
-        };
-        w.onerror=function(){ toast('写入文件失败'); };
-        var bs=atob(b64), ab=new ArrayBuffer(bs.length), ia=new Uint8Array(ab);
-        for(var i=0;i<bs.length;i++){ ia[i]=bs.charCodeAt(i); }
-        w.write(new Blob([ab], {type:mime}));
-      }, function(){ toast('创建写入器失败'); });
-    }, function(){ toast('创建文件失败'); });
-  }, function(){ toast('目录解析失败'); });
+  /* 2) 降级：file 插件写外部缓存并提示路径 */
+  if(window.cordova && cordova.file){
+    var dir=cordova.file.externalCacheDirectory||cordova.file.cacheDirectory||null;
+    if(dir){
+      window.resolveLocalFileSystemURL(dir, function(d){
+        d.getFile(filename, {create:true, exclusive:false}, function(fe){
+          fe.createWriter(function(w){
+            w.onwriteend=function(){ toast('已保存到：'+fe.fullPath+'（文件管理器中可打开并分享）'); };
+            w.onerror=function(){ toast('写入文件失败'); };
+            var bs=atob(b64), ab=new ArrayBuffer(bs.length), ia=new Uint8Array(ab);
+            for(var i=0;i<bs.length;i++){ ia[i]=bs.charCodeAt(i); }
+            w.write(new Blob([ab], {type:mime}));
+          }, function(){ toast('创建写入器失败'); });
+        }, function(){ toast('创建文件失败'); });
+      }, function(){ toast('目录解析失败'); });
+      return;
+    }
+  }
+  /* 3) PC 预览：浏览器 blob 下载 */
+  var bin=atob(b64), ab2=new ArrayBuffer(bin.length), ia2=new Uint8Array(ab2);
+  for(var i=0;i<bin.length;i++){ ia2[i]=bin.charCodeAt(i); }
+  download(new Blob([ab2], {type:mime}), filename);
+  toast('已下载：'+filename);
 }
 
 $('#btn-clear').addEventListener('click', function(){

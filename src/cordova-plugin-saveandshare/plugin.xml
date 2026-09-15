@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<plugin xmlns="http://apache.org/cordova/ns/plugins/1.0"
+        id="cn.workbuddy.saveandshare"
+        version="1.0.0">
+  <name>SaveAndShare</name>
+  <description>Write base64 to external cache and launch Android system share sheet</description>
+  <js-module src="www/SaveAndShare.js" name="SaveAndShare">
+    <clobbers target="cordova.plugins.saveandshare" />
+  </js-module>
+  <platform name="android">
+    <config-file target="AndroidManifest.xml" parent="application">
+      <provider
+        android:name="androidx.core.content.FileProvider"
+        android:authorities="${applicationId}.saveandshare.provider"
+        android:exported="false"
+        android:grantUriPermissions="true">
+        <meta-data android:name="android.support.FILE_PROVIDER_PATHS"
+                   android:resource="@xml/saveandshare_paths" />
+      </provider>
+    </config-file>
+    <source-file src="src/android/SaveAndShare.java"
+                 target-dir="src/cn/workbuddy/saveandshare" />
+    <resource-file src="src/android/saveandshare_paths.xml" target="res/xml/saveandshare_paths.xml" />
+  </platform>
+</plugin>
