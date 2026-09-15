@@ -1,0 +1,19 @@
+{
+  "name": "cordova-plugin-saveandshare",
+  "version": "1.0.0",
+  "description": "Write base64 content to a file and launch the Android system share sheet",
+  "cordova": {
+    "id": "cn.workbuddy.saveandshare",
+    "platforms": [
+      "android"
+    ]
+  },
+  "keywords": [
+    "cordova",
+    "saveandshare",
+    "share",
+    "file"
+  ],
+  "engines": [],
+  "license": "MIT"
+}
