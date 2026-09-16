@@ -41,7 +41,7 @@ jobs:
 
       - name: Bump android-versionCode (unique per run, so side-load upgrade always replaces old app)
         run: |
-          VC=$(date +%Y%m%d)$(printf '%03d' $GITHUB_RUN_NUMBER)
+          VC=$(( 2000000000 + ${GITHUB_RUN_NUMBER:-0} ))
           echo "Using android-versionCode=$VC"
           sed -i "s|xmlns:android=\"http://schemas.android.com/apk/res/android\">|android-versionCode=\"$VC\" xmlns:android=\"http://schemas.android.com/apk/res/android\">|" config.xml
           grep -n "android-versionCode" config.xml
