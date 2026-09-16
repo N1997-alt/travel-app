@@ -1281,14 +1281,8 @@ $('#btn-csv').addEventListener('click', function(){
   var ws=XLSX.utils.aoa_to_sheet(data);
   var wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '账本');
-  if(window.cordova && window.plugins && window.plugins.socialsharing){
-    var b64=XLSX.write(wb, {bookType:'xlsx', type:'base64'});
-    saveFileAndShare(b64, '旅行账本.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  } else {
-    var out=XLSX.write(wb, {bookType:'xlsx', type:'array'});
-    download(new Blob([out], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), '旅行账本.xlsx');
-    toast('已导出 Excel');
-  }
+  var b64=XLSX.write(wb, {bookType:'xlsx', type:'base64'});
+  saveFileAndShare(b64, '旅行账本.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 });
 $('#btn-txt').addEventListener('click', function(){
   if(!state.dy.length){ toast('还没有心声数据'); return; }
@@ -1349,7 +1343,6 @@ $('#btn-tpl').addEventListener('click', function(){
   var ws=XLSX.utils.aoa_to_sheet(tpl);
   var wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '导入模板');
-  var b64=XLSX.write(wb, {bookType:'xlsx', type:'base64'});
   var b64=XLSX.write(wb, {bookType:'xlsx', type:'base64'});
   saveFileAndShare(b64, '账本导入模板.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 });
