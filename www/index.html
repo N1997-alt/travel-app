@@ -1295,13 +1295,8 @@ $('#btn-txt').addEventListener('click', function(){
   var entries=state.dy.slice().sort(function(a,b){ return a.createdAt-b.createdAt; }).map(function(d){
     return { time:fmtTime(d.createdAt), weather:d.weather||'', title:d.title||'', body:d.body||'' };
   });
-  if(window.cordova && window.plugins && window.plugins.socialsharing){
-    var b64=makeDocxBase64(entries);
-    saveFileAndShare(b64, '旅行心声.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-  } else {
-    download(makeDocxBlob(entries), '旅行心声.docx');
-    toast('已导出 Word');
-  }
+  var b64=makeDocxBase64(entries);
+  saveFileAndShare(b64, '旅行心声.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
 });
 
 /* 费用 Excel 导入 */
@@ -1361,33 +1356,45 @@ $('#btn-tpl').addEventListener('click', function(){
 
 /* 手机端：自定义原生插件把 base64 写成文件并调起系统分享面板（微信/保存到文件/蓝牙）；
    若插件不可用则降级用 file 插件写外部缓存并提示路径；PC 预览走浏览器 blob 下载。 */
+/* 获取自写原生插件：优先 clobbers，失败用 cordova.require 兜底（绕过个别机型 clobbers 未挂载的问题） */
+function getSaveAndShare(){
+  try { if(window.cordova && cordova.plugins && cordova.plugins.saveandshare && cordova.plugins.saveandshare.saveAndShare) return cordova.plugins.saveandshare; } catch(e){}
+  try { if(window.cordova && cordova.require){ var m=cordova.require('cn.workbuddy.saveandshare.SaveAndShare'); if(m && m.saveAndShare) return m; } } catch(e){}
+  return null;
+}
+/* 手机端：把 base64 写入系统「下载」目录并调起系统分享面板（微信/保存到文件/蓝牙）；失败降级 file 插件写外部缓存；PC 预览走浏览器 blob 下载 */
 function saveFileAndShare(b64, filename, mime){
-  /* 1) 自定义原生插件：最稳，直接调起系统分享面板 */
-  if(window.cordova && cordova.plugins && cordova.plugins.saveandshare){
-    cordova.plugins.saveandshare.saveAndShare(b64, filename, mime,
-      function(path){ toast('已调起系统分享，选“微信 / 保存到文件”即可'); },
-      function(e){ toast('保存失败：'+e); });
+  var sas=getSaveAndShare();
+  if(sas){
+    sas.saveAndShare(b64, filename, mime,
+      function(msg){ toast((msg&&(''+msg).length)?msg:('已保存：'+filename+'（系统「下载」目录 / 可在分享面板选微信或保存到文件）')); },
+      function(e){ toast('保存失败：'+e+'，尝试备用方式'); saveFileFallback(b64, filename, mime); });
     return;
   }
-  /* 2) 降级：file 插件写外部缓存并提示路径 */
+  saveFileFallback(b64, filename, mime);
+}
+/* 降级：file 插件写外部缓存（部分国产 ROM 仍可读）；再不行 PC 下载 */
+function saveFileFallback(b64, filename, mime){
   if(window.cordova && cordova.file){
     var dir=cordova.file.externalCacheDirectory||cordova.file.cacheDirectory||null;
     if(dir){
       window.resolveLocalFileSystemURL(dir, function(d){
         d.getFile(filename, {create:true, exclusive:false}, function(fe){
           fe.createWriter(function(w){
-            w.onwriteend=function(){ toast('已保存到：'+fe.fullPath+'（文件管理器中可打开并分享）'); };
-            w.onerror=function(){ toast('写入文件失败'); };
+            w.onwriteend=function(){ toast('已保存到：'+fe.fullPath+'（用文件管理器打开后可分享给微信）'); };
+            w.onerror=function(){ pcDownload(b64, filename, mime); };
             var bs=atob(b64), ab=new ArrayBuffer(bs.length), ia=new Uint8Array(ab);
             for(var i=0;i<bs.length;i++){ ia[i]=bs.charCodeAt(i); }
             w.write(new Blob([ab], {type:mime}));
-          }, function(){ toast('创建写入器失败'); });
-        }, function(){ toast('创建文件失败'); });
-      }, function(){ toast('目录解析失败'); });
+          }, function(){ pcDownload(b64, filename, mime); });
+        }, function(){ pcDownload(b64, filename, mime); });
+      }, function(){ pcDownload(b64, filename, mime); });
       return;
     }
   }
-  /* 3) PC 预览：浏览器 blob 下载 */
+  pcDownload(b64, filename, mime);
+}
+function pcDownload(b64, filename, mime){
   var bin=atob(b64), ab2=new ArrayBuffer(bin.length), ia2=new Uint8Array(ab2);
   for(var i=0;i<bin.length;i++){ ia2[i]=bin.charCodeAt(i); }
   download(new Blob([ab2], {type:mime}), filename);

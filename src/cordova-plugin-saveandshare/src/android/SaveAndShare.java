@@ -69,7 +69,7 @@ public class SaveAndShare extends CordovaPlugin {
                         share.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
                         Intent chooser = Intent.createChooser(share, "分享到");
                         cordova.getActivity().startActivity(chooser);
-                        cb.success("已保存到下载目录：" + fileName);
+                        cb.success("已保存到系统「下载」目录：" + fileName + "（若未弹出分享面板，请到文件管理器的 Download 目录查找）");
                     } catch (Exception e) {
                         cb.error(e.getMessage());
                     }
