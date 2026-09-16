@@ -1355,43 +1355,54 @@ function getSaveAndShare(){
   try { if(window.cordova && cordova.require){ var m=cordova.require('cn.workbuddy.saveandshare.SaveAndShare'); if(m && m.saveAndShare) return m; } } catch(e){}
   return null;
 }
-/* 手机端：把 base64 写入系统「下载」目录并调起系统分享面板（微信/保存到文件/蓝牙）；失败降级 file 插件写外部缓存；PC 预览走浏览器 blob 下载 */
+/* 手机端：把 base64 写入系统「下载」目录并调起系统分享面板（微信/保存到文件/蓝牙）；
+   原生插件不可用则降级用 file 插件写真实可寻址目录并明确回报路径；仅在 PC 浏览器预览时才走 blob 下载。 */
 function saveFileAndShare(b64, filename, mime){
   var sas=getSaveAndShare();
   if(sas){
     sas.saveAndShare(b64, filename, mime,
-      function(msg){ toast((msg&&(''+msg).length)?msg:('已保存：'+filename+'（系统「下载」目录 / 可在分享面板选微信或保存到文件）')); },
-      function(e){ toast('保存失败：'+e+'，尝试备用方式'); saveFileFallback(b64, filename, mime); });
+      function(msg){ toast((msg&&(''+msg).length)?msg:('已保存：'+filename)); },
+      function(e){ console.warn('SaveAndShare 原生保存失败：'+e); toast('原生保存失败，改用文件缓存：'+e); saveFileFallback(b64, filename, mime); });
     return;
   }
+  console.warn('SaveAndShare 原生插件未加载，改用文件缓存兜底');
   saveFileFallback(b64, filename, mime);
 }
-/* 降级：file 插件写外部缓存（部分国产 ROM 仍可读）；再不行 PC 下载 */
+/* 降级：用 cordova-plugin-file 把文件写进真实可寻址目录（外部缓存→外部根Download→内部data），并明确回报路径；都不行才 blob */
 function saveFileFallback(b64, filename, mime){
   if(window.cordova && cordova.file){
-    var dir=cordova.file.externalCacheDirectory||cordova.file.cacheDirectory||null;
-    if(dir){
+    var dirs=[
+      cordova.file.externalCacheDirectory,
+      (cordova.file.externalRootDirectory ? cordova.file.externalRootDirectory+'Download/' : null),
+      cordova.file.dataDirectory
+    ].filter(Boolean);
+    var idx=0;
+    function tryNext(){
+      if(idx>=dirs.length){ pcDownload(b64, filename, mime); return; }
+      var dir=dirs[idx++];
       window.resolveLocalFileSystemURL(dir, function(d){
         d.getFile(filename, {create:true, exclusive:false}, function(fe){
           fe.createWriter(function(w){
-            w.onwriteend=function(){ toast('已保存到：'+fe.fullPath+'（用文件管理器打开后可分享给微信）'); };
-            w.onerror=function(){ pcDownload(b64, filename, mime); };
+            w.onwriteend=function(){ toast('已保存到：'+fe.fullPath+'（用文件管理器打开该路径即可查看/分享）'); };
+            w.onerror=function(){ tryNext(); };
             var bs=atob(b64), ab=new ArrayBuffer(bs.length), ia=new Uint8Array(ab);
             for(var i=0;i<bs.length;i++){ ia[i]=bs.charCodeAt(i); }
             w.write(new Blob([ab], {type:mime}));
-          }, function(){ pcDownload(b64, filename, mime); });
-        }, function(){ pcDownload(b64, filename, mime); });
-      }, function(){ pcDownload(b64, filename, mime); });
-      return;
+          }, function(){ tryNext(); });
+        }, function(){ tryNext(); });
+      }, function(){ tryNext(); });
     }
+    tryNext();
+    return;
   }
   pcDownload(b64, filename, mime);
 }
+/* 仅 PC 浏览器预览时使用的 blob 下载；App 内不应走到这里（会提示无效） */
 function pcDownload(b64, filename, mime){
   var bin=atob(b64), ab2=new ArrayBuffer(bin.length), ia2=new Uint8Array(ab2);
   for(var i=0;i<bin.length;i++){ ia2[i]=bin.charCodeAt(i); }
   download(new Blob([ab2], {type:mime}), filename);
-  toast('已下载：'+filename);
+  toast('已触发浏览器下载：'+filename+'（手机 App 内此方式可能无效，请用上方保存/分享）');
 }
 
 $('#btn-clear').addEventListener('click', function(){
